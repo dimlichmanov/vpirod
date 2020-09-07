@@ -8,3 +8,4 @@ if __name__ == '__main__':
     channel.basic_publish(exchange='', routing_key='hello', body='Hello World')
     print("Sent Hello World")
     connection.close()
+    connection.close()
