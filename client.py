@@ -3,7 +3,6 @@ import uuid
 
 
 class FibonacciRpcClient(object):
-
     def __init__(self):
         self.connection = pika.BlockingConnection(
             pika.ConnectionParameters(host='localhost'))
@@ -13,7 +12,7 @@ class FibonacciRpcClient(object):
 
         self.channel = self.connection.channel()
 
-        result = self.channel.queue_declare(queue='', exclusive=True)  # Queue for replies
+        result = self.channel.queue_declare(queue='kek', exclusive=True)  # Queue for replies
         self.callback_queue = result.method.queue # A single queue for two servers
 
         self.channel.basic_consume(
@@ -38,7 +37,7 @@ class FibonacciRpcClient(object):
             body=str(n))
         while self.response is None:
             self.connection.process_data_events()
-        return int(self.response)
+        return self.response
 
 class FibonacciRpcClient1(object):
 
@@ -76,7 +75,7 @@ class FibonacciRpcClient1(object):
             body=str(n))
         while self.response is None:
             self.connection.process_data_events()
-        return int(self.response)
+        return self.response
 
 
 
@@ -84,12 +83,13 @@ class FibonacciRpcClient1(object):
 
 fibonacci_rpc1 = FibonacciRpcClient()
 
-print(" [x] Requesting fib(30)")
-response = fibonacci_rpc1.call(30)
-print(" [.] Got %r" % response)
-
 fibonacci_rpc2 = FibonacciRpcClient1()
 
-print(" [x] Requesting fib(30)")
-response = fibonacci_rpc2.call(20)
-print(" [.] Got %r" % response)
+
+response = fibonacci_rpc1.call(30)
+print(response)
+
+
+
+response2 = fibonacci_rpc2.call(20)
+print(response2)
