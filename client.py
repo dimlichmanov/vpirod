@@ -86,10 +86,10 @@ fibonacci_rpc1 = FibonacciRpcClient()
 fibonacci_rpc2 = FibonacciRpcClient1()
 
 
-response = fibonacci_rpc1.call(30)
+response = fibonacci_rpc1.call(chr('B'))
 print(response)
 
 
 
-response2 = fibonacci_rpc2.call(20)
+response2 = fibonacci_rpc2.call(chr('B'))
 print(response2)
