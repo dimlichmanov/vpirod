@@ -11,7 +11,7 @@ channel.queue_declare(queue='rpc_queue')  # establishing a queue
 
 
 def on_request(ch, method, props, body):
-    letter = chr(body)
+    letter = int(body)
     debug_mode = 0
     with open('ny.osm') as osm_file:
         soup = BeautifulSoup(osm_file, features="html.parser")
@@ -26,7 +26,7 @@ def on_request(ch, method, props, body):
                 a = tag_line['k']
                 if 'highway' == a:
                     flag = 1
-                if 'name' == a and flag == 1 and tag_line['v'][0] == letter:
+                if 'name' == a and flag == 1 and tag_line['v'][0] == chr(letter):
                     spisok.append(tag_line['v'])
 
         spisok = pd.Series(spisok)

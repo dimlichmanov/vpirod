@@ -82,14 +82,22 @@ class FibonacciRpcClient1(object):
 
 
 fibonacci_rpc1 = FibonacciRpcClient()
-
+print('a')
 fibonacci_rpc2 = FibonacciRpcClient1()
+print('b')
 
-
-response = fibonacci_rpc1.call(chr('B'))
+response = fibonacci_rpc1.call(ord('B'))
+print('c')
 print(response)
+print('d')
 
 
-
-response2 = fibonacci_rpc2.call(chr('B'))
+response2 = fibonacci_rpc2.call(ord('B'))
+print('e')
 print(response2)
+print('f')
+
+if int(response) > int(response2):
+    print('NY has more roads')
+else:
+    print('Portland has more roads')
