@@ -2,7 +2,7 @@ import pika
 import uuid
 
 
-class FibonacciRpcClient(object):
+class NY_query(object):
     def __init__(self):
         self.connection = pika.BlockingConnection(
             pika.ConnectionParameters(host='localhost'))
@@ -12,7 +12,7 @@ class FibonacciRpcClient(object):
 
         self.channel = self.connection.channel()
 
-        result = self.channel.queue_declare(queue='kek', exclusive=True)  # Queue for replies
+        result = self.channel.queue_declare(queue='', exclusive=True)  # Queue for replies
         self.callback_queue = result.method.queue # A single queue for two servers
 
         self.channel.basic_consume(
@@ -35,11 +35,12 @@ class FibonacciRpcClient(object):
                 correlation_id=self.corr_id,
             ),
             body=str(n))
+    def get_result(self):
         while self.response is None:
             self.connection.process_data_events()
         return self.response
 
-class FibonacciRpcClient1(object):
+class Portland_query(object):
 
     def __init__(self):
         self.connection = pika.BlockingConnection(
@@ -73,6 +74,8 @@ class FibonacciRpcClient1(object):
                 correlation_id=self.corr_id,
             ),
             body=str(n))
+
+    def get_result(self):
         while self.response is None:
             self.connection.process_data_events()
         return self.response
@@ -81,23 +84,19 @@ class FibonacciRpcClient1(object):
 
 
 
-fibonacci_rpc1 = FibonacciRpcClient()
+ny_client = NY_query()
+portland_client = Portland_query()
 print('a')
-fibonacci_rpc2 = FibonacciRpcClient1()
+ny_client.call(ord('B'))
 print('b')
-
-response = fibonacci_rpc1.call(ord('B'))
+portland_client.call(ord('B'))
 print('c')
-print(response)
+response_from_ny = ny_client.get_result()
 print('d')
-
-
-response2 = fibonacci_rpc2.call(ord('B'))
+response_from_portland = portland_client.get_result()
 print('e')
-print(response2)
-print('f')
 
-if int(response) > int(response2):
-    print('NY has more roads')
+if int(response_from_ny) > int(response_from_portland):
+    print('NY has more roads {} versus {}'.format(int(response_from_ny), int(response_from_portland)))
 else:
-    print('Portland has more roads')
+    print('Portland has more roads {} versus {}'.format(int(response_from_portland), int(response_from_ny)))
