@@ -11,7 +11,7 @@ channel.queue_declare(queue='rpc1_queue')  # establishing a queue
 
 def on_request(ch, method, props, body):
     letter = int(body)
-    debug_mode = 0
+    debug_mode = 1
     with open('portland.osm') as osm_file:
         soup = BeautifulSoup(osm_file, features="html.parser")
         streets_all = soup.find_all('way')
@@ -33,10 +33,10 @@ def on_request(ch, method, props, body):
         if debug_mode == 0:
             message = str(len(spisok))
         else:
-            c = ''
             for street in spisok:
-                c = c + ' ' + str(street) + ','
-            message = c
+                print(street)
+            message = str(len(spisok))
+
 
 
     ch.basic_publish(exchange='',

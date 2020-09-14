@@ -13,7 +13,7 @@ class NY_query(object):
         self.channel = self.connection.channel()
 
         result = self.channel.queue_declare(queue='', exclusive=True)  # Queue for replies
-        self.callback_queue = result.method.queue # A single queue for two servers
+        self.callback_queue = result.method.queue
 
         self.channel.basic_consume(
             queue=self.callback_queue,
@@ -52,7 +52,7 @@ class Portland_query(object):
         self.channel = self.connection.channel()
 
         result = self.channel.queue_declare(queue='', exclusive=True)  # Queue for replies
-        self.callback_queue = result.method.queue # A single queue for two servers
+        self.callback_queue = result.method.queue
 
         self.channel.basic_consume(
             queue=self.callback_queue,
@@ -81,20 +81,16 @@ class Portland_query(object):
         return self.response
 
 
-
-
-
 ny_client = NY_query()
 portland_client = Portland_query()
-print('a')
+
 ny_client.call(ord('B'))
-print('b')
 portland_client.call(ord('B'))
-print('c')
+
+print("Waiting...\n")
+
 response_from_ny = ny_client.get_result()
-print('d')
 response_from_portland = portland_client.get_result()
-print('e')
 
 if int(response_from_ny) > int(response_from_portland):
     print('NY has more roads {} versus {}'.format(int(response_from_ny), int(response_from_portland)))
