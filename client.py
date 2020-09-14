@@ -84,8 +84,8 @@ class Portland_query(object):
 ny_client = NY_query()
 portland_client = Portland_query()
 
-ny_client.call(ord('B'))
-portland_client.call(ord('B'))
+ny_client.call(ord('Y'))
+portland_client.call(ord('Y'))
 
 print("Waiting...\n")
 
