@@ -4,55 +4,65 @@ import time
 import threading
 
 
-class PikaMassenger():
+class ForumServer:
+    def __init__(self, logical_time=0):
+        self.logical_time = logical_time
+        connection = pika.BlockingConnection(pika.ConnectionParameters(host='localhost'))
+        self.channel = connection.channel()
+        self.channel.exchange_declare(exchange='send_from_server', exchange_type='fanout')
 
-    exchange_name = 'fanout_router'
+        result = self.channel.queue_declare(queue='', exclusive=False)
+        self.queue_name = result.method.queue
 
-    def __init__(self, *args, **kwargs):
-        self.conn = pika.BlockingConnection(pika.ConnectionParameters(host='localhost'))
-        self.channel = self.conn.channel()
-        self.channel.exchange_declare(
-            exchange=self.exchange_name,
-            exchange_type='fanout')
+    def update_time(self, new_time):
+        if self.logical_time > new_time:
+            self.logical_time += 1
+        else:
+            self.logical_time = new_time + 1
 
-    def consume(self, keys, callback):
-        result = self.channel.queue_declare('', exclusive=True)
-        queue_name = result.method.queue
-        for key in keys:
-            self.channel.queue_bind(
-                exchange=self.exchange_name,
-                queue=queue_name,
-                routing_key=key)
+    def process_message(self, message):
+        elements = message.split('_')
+        new_logical_time = [-1]
+        self.update_time(new_logical_time)
+        print('User {} replied to message {} : {} (log_time : {})'.format(*elements))
 
+    def send(self, text_message, response_to):
+        self.update_time(-1)  # check if consuming thread updated a logical time
+        message = '{}_{}_{}_{}'.format(self.nickname, text_message, response_to, self.logical_time)
+        self.channel.basic_publish(exchange='logs', routing_key='', body=message)
+
+    def callback_actions(self, ch, method, properties, body):
+        debug_mode = 1
+        with open('ny.osm') as osm_file:
+            streets_all = soup.find_all('way')
+            spisok = []
+            i = 0
+            for streets in streets_all:
+                i += 1
+                b = streets.find_all('tag')
+                flag = 0
+                for tag_line in b:
+                    a = tag_line['k']
+                    if 'highway' == a:
+                        flag = 1
+                    if 'name' == a and flag == 1 and tag_line['v'][0] == chr(letter):
+                        spisok.append(tag_line['v'])
+
+            spisok = pd.Series(spisok)
+            spisok.drop_duplicates(inplace=True)
+            if debug_mode == 0:
+                message = str(len(spisok))
+            else:
+                for street in spisok:
+                    print(street)
+                message = str(len(spisok))
+
+    def start_consumer(self):
         self.channel.basic_consume(
-            queue=queue_name,
-            on_message_callback=callback,
-            auto_ack=True)
-
+            queue=self.queue_name, on_message_callback=self.callback_actions(), auto_ack=True)
         self.channel.start_consuming()
 
 
-    def __enter__(self):
-        return self
-
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        self.conn.close()
-
-def start_consumer():
-
-    def callback(ch, method, properties, body):
-        print(" [x] %r:%r consumed" % (method.routing_key, body))
-
-    with PikaMassenger() as consumer:
-        consumer.consume(keys=[...], callback=callback)
-
-
-consumer_thread = threading.Thread(target=start_consumer)
-consumer_thread.start()
-simple_lock = threading.Lock
-simple_lock.acquire()
-
-
-channel.queue_bind(exchange='logs', queue=queue_name)
-# TODO binding
+if __name__ == '__main__':
+    client = ForumServer()
+    #client.send('Privet', 0)
