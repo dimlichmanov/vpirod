@@ -37,7 +37,6 @@ class ForumClient:
 
     def send(self, text_message, response_to):
         # Update logical time and send a message
-        # self.update_time(-1)
         message_send = '{}_{}_{}_{}'.format(self.nickname, response_to, text_message, self.logical_time)
         self.channel_send.basic_publish(exchange='send_to_server', routing_key='', body=message_send)
 
