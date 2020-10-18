@@ -37,11 +37,10 @@ class ForumServer:
         elements = body.decode("utf-8").split('_')
         new_logical_time = int(elements[-1])
         self.update_time(new_logical_time)
-        print(self.logical_time)
-        posting = '#{} - User {} replied to message {} : {} (time : {})'.format(self.message_counter, *elements[:-1], self.logical_time)
+        posting = '#{} - User {} replied to message {} : {} (time : {})'.format(self.message_counter, elements[0],elements[1],elements[2], self.logical_time)
         print(posting)
         self.message_counter += 1
-        message = posting + '_' + str(new_logical_time)
+        message = posting + '_' + str(self.logical_time)
         self.channel_send.basic_publish(exchange='send_from_server', routing_key='', body=message)
 
     def start_consumer(self):

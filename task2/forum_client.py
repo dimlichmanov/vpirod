@@ -1,4 +1,3 @@
-import sys
 import threading
 import pika
 import time
@@ -38,15 +37,15 @@ class ForumClient:
 
     def send(self, text_message, response_to):
         # Update logical time and send a message
-        #self.update_time(-1)
-        message = '{}_{}_{}_{}'.format(self.nickname, response_to, text_message, self.logical_time)
-        self.channel_send.basic_publish(exchange='send_to_server', routing_key='', body=message)
+        # self.update_time(-1)
+        message_send = '{}_{}_{}_{}'.format(self.nickname, response_to, text_message, self.logical_time)
+        self.channel_send.basic_publish(exchange='send_to_server', routing_key='', body=message_send)
 
     def callback_actions(self, ch, method, properties, body):
         # Update local logic time and sleep again
-        message = body.decode("utf-8").split('_')
-        print(message[:-1][0])
-        received_time = int(message[-1])
+        message_rec = body.decode("utf-8").split('_')
+        print(message_rec[:-1][0])
+        received_time = int(message_rec[-1])
         self.update_time(received_time)
 
     def start_consumer(self):
@@ -58,10 +57,10 @@ class ForumClient:
 
 if __name__ == '__main__':
     initial = str(input("Enter yor nickname and logical time: "))
-    nickname = str(initial.split('_')[0])
+    nick = str(initial.split('_')[0])
     log_time = int(initial.split('_')[1])
 
-    client = ForumClient(nickname=nickname, logical_time=log_time)
+    client = ForumClient(nickname=nick, logical_time=log_time)
 
     message = str(input("Enter yor message: "))
     text = str(message.split('_')[0])
