@@ -55,7 +55,6 @@ class ForumServer:
         else:
             self.current_history = self.messages[0]+'\n'
             self.gain_history(0, 1)
-            print(self.current_history)
             self.channel_send.basic_publish(exchange='', routing_key=str(elements[0]), body=self.current_history)
 
     def start_consumer(self):
