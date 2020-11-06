@@ -15,7 +15,7 @@ class BackendCoord:
         result = self.channel.queue_declare(queue='backend_coord_queue', exclusive=True)  # Queue for queries to backend
         self.query_queue = result.method.queue
 
-        result = self.channel.queue_declare(queue='workers_to_coord', exclusive=True)  # Queue for queries to backend
+        result = self.channel.queue_declare(queue='workers_to_coord', exclusive=False)  # Queue for queries to backend
         self.callback_queue = result.method.queue
 
         self.channel.basic_consume(
@@ -43,7 +43,6 @@ class BackendCoord:
         message_rec = body.decode("utf-8").split('_')
         self.filename = str(message_rec[0])
         self.num_parts = str(message_rec[1])
-
 
     def start_consumer(self):
         # Sleep on input queue
