@@ -9,7 +9,6 @@ import pika
 
 class Backend:
     def __init__(self, num):
-
         # Initialize connections
         self.connection = pika.BlockingConnection(pika.ConnectionParameters(host='localhost'))
         self.channel = self.connection.channel()
@@ -22,7 +21,7 @@ class Backend:
         self.start_consumer()
 
     def callback_actions(self, ch, method, properties, body):
-        # Split a message, retrieve a logical time, send a client-friendly message to clients
+        # Split a message, retrieve coordinates and send a json file
         els = body.decode("utf-8").split('_')
         if len(els) > 1:  # Working with coordinates
             file = geopandas.read_file(self.filename)

@@ -30,6 +30,7 @@ class Client:
         for i in range(self.num_parts):
             resp = self.start_consumer()
             # TODO display result
+            print(resp)
             self.response = None
 
     def callback_actions(self, ch, method, properties, body):

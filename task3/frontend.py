@@ -31,29 +31,25 @@ class Frontend:
             on_message_callback=self.callback_actions_backend,
             auto_ack=True)
 
-    def get_chat(self):
+    def get_minimaps(self):
         self.start_consumer_client()
         if self.response:
-            message_send = '{}_{}'.format(self.filename, self.num_parts)
+            message_send = self.response
             self.channel_backend.basic_publish(exchange='', routing_key='backend_coord_queue', body=message_send)
             self.response = None
         for i in range(self.num_parts):
-            resp = self.start_consumer_backend()
-            print(resp)
+            message_resp = self.start_consumer_backend()
+            self.channel_backend.basic_publish(exchange='', routing_key=self.queue_response, body=message_resp)
             self.response = None
 
     def callback_actions_client(self, ch, method, properties, body):
-        message_rec = body.decode("utf-8").split('_')
-        self.filename = str(message_rec[0])
-        self.num_parts = str(message_rec[1])
+        message_rec = body.decode("utf-8")
         self.queue_response = properties.reply_to
-        self.response = True
+        self.response = message_rec
 
     def callback_actions_backend(self, ch, method, properties, body):
-        message_rec = body.decode("utf-8").split('_')
-        self.filename = str(message_rec[0])
-        self.num_parts = str(message_rec[1])
-        self.response = True
+        message_rec = body
+        self.response = message_rec
 
     def start_consumer_client(self):
         while self.response is None:
@@ -68,4 +64,4 @@ class Frontend:
 
 if __name__ == '__main__':
     a = Frontend()
-    a.get_chat()
+    a.get_minimaps()
