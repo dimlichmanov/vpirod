@@ -1,5 +1,4 @@
 import pika
-import threading
 
 
 class Frontend:
