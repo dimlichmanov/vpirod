@@ -43,6 +43,8 @@ class Frontend:
 
     def callback_actions_client(self, ch, method, properties, body):
         message_rec = body.decode("utf-8")
+        self.num_parts = int(message_rec.split('_')[1])
+        print('ok')
         self.queue_response = properties.reply_to
         self.response = message_rec
 
