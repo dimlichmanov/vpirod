@@ -23,16 +23,17 @@ class Backend:
     def callback_actions(self, ch, method, properties, body):
         # Split a message, retrieve coordinates and send a json file
         els = body.decode("utf-8").split('_')
+        print('ok')
         if len(els) > 1:  # Working with coordinates
+            self.filename = str(els[0])
             file = geopandas.read_file(self.filename)
             file.drop(index=[3, 50], inplace=True)
-            quadrant = geopandas.GeoSeries([Polygon([(els[0], els[1]), (els[2], els[3]), (els[4], els[5]), (els[6], els[7])])])
+            quadrant = geopandas.GeoSeries([Polygon([(int(els[1]), int(els[2])), (int(els[3]), int(els[4])), (int(els[5]), int(els[6])), (int(els[7]), int(els[8]))])])
             df1 = geopandas.GeoDataFrame({'geometry': quadrant, 'df1': [1]})
             res_intersect = geopandas.overlay(df1, file, how='intersection')
-            res_intersect = json.dumps(res_intersect.to_json())
-            self.channel.basic_publish(exchange='', routing_key='workers_to_coord', body=res_intersect)
-        else:  # Working with file parameter
-            self.filename = els[0]
+            res_intersect = res_intersect.to_json()
+            self.channel.basic_publish(exchange='', routing_key='workers_to_coord_queue', body=res_intersect)
+            print('send')
 
     def start_consumer(self):
         self.channel.basic_consume(

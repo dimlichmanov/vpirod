@@ -4,7 +4,7 @@ import uuid
 
 
 class Client:
-    def __init__(self, filename, num_parts=4):
+    def __init__(self, filename, num_parts=2):
         self.filename = filename
         self.num_parts = num_parts
         self.connection = pika.BlockingConnection(pika.ConnectionParameters(host='localhost'))
@@ -29,12 +29,13 @@ class Client:
             ), body=message_send)
         for i in range(self.num_parts):
             resp = self.start_consumer()
-            # TODO display result
-            print(resp)
+            part_file = open("part_{}.geojson".format(i), "w")
+            part_file.write(resp)
+            part_file.close()
             self.response = None
 
     def callback_actions(self, ch, method, properties, body):
-        self.response = body
+        self.response = body.decode("utf-8")
 
     def start_consumer(self):
         # Sleep on input queue

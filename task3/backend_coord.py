@@ -36,20 +36,22 @@ class BackendCoord:
 
     def get_minimaps(self):
         self.start_consumer_frontend()
+        print('ok')
         if self.response:
             self.response = None
             bord = self.borders
             message = []
             if self.num_parts == 1:
-                message.append('{}_{}_{}_{}_{}_{}_{}_{}'.format(bord[0], bord[2], bord[0], bord[3], bord[1], bord[3], bord[1], bord[2]))
+                message.append('{}_{}_{}_{}_{}_{}_{}_{}_{}'.format(self.filename, bord[0], bord[2], bord[0], bord[3], bord[1], bord[3], bord[1], bord[2]))
             if self.num_parts == 2:
-                message.append('{}_{}_{}_{}_{}_{}_{}_{}'.format(self.cents[1], bord[2], self.cents[1], bord[3], bord[1], bord[3], bord[1], bord[2]))
-                message.append('{}_{}_{}_{}_{}_{}_{}_{}'.format(bord[0], bord[2], bord[0], bord[3], self.cents[1], bord[3], self.cents[1], bord[2]))
+                message.append('{}_{}_{}_{}_{}_{}_{}_{}_{}'.format(self.filename, self.cents[1], bord[2], self.cents[1], bord[3], bord[1], bord[3], bord[1], bord[2]))
+                message.append('{}_{}_{}_{}_{}_{}_{}_{}_{}'.format(self.filename, bord[0], bord[2], bord[0], bord[3], self.cents[1], bord[3], self.cents[1], bord[2]))
+                print('ok')
             if self.num_parts == 4:
-                message.append('{}_{}_{}_{}_{}_{}_{}_{}'.format(bord[0], bord[2], bord[0], self.cents[0], self.cents[1], self.cents[0], self.cents[1], bord[2]))
-                message.append('{}_{}_{}_{}_{}_{}_{}_{}'.format(bord[0], self.cents[0], bord[0], bord[3], self.cents[1], bord[3], self.cents[1], self.cents[0]))
-                message.append('{}_{}_{}_{}_{}_{}_{}_{}'.format(self.cents[1], self.cents[0], self.cents[1], bord[3], bord[1], bord[3], bord[1], self.cents[0]))
-                message.append('{}_{}_{}_{}_{}_{}_{}_{}'.format(self.cents[1], bord[2], self.cents[1], self.cents[0], bord[1], self.cents[1], bord[1], bord[2]))
+                message.append('{}_{}_{}_{}_{}_{}_{}_{}_{}'.format(self.filename, bord[0], bord[2], bord[0], self.cents[0], self.cents[1], self.cents[0], self.cents[1], bord[2]))
+                message.append('{}_{}_{}_{}_{}_{}_{}_{}_{}'.format(self.filename, bord[0], self.cents[0], bord[0], bord[3], self.cents[1], bord[3], self.cents[1], self.cents[0]))
+                message.append('{}_{}_{}_{}_{}_{}_{}_{}_{}'.format(self.filename, self.cents[1], self.cents[0], self.cents[1], bord[3], bord[1], bord[3], bord[1], self.cents[0]))
+                message.append('{}_{}_{}_{}_{}_{}_{}_{}_{}'.format(self.filename, self.cents[1], bord[2], self.cents[1], self.cents[0], bord[1], self.cents[1], bord[1], bord[2]))
             for i in range(self.num_parts):
                 self.channel_backend.basic_publish(exchange='', routing_key='worker_{}'.format(i % self.num_workers), body=message[i])
 
@@ -60,8 +62,8 @@ class BackendCoord:
 
     def callback_actions_frontend(self, ch, method, properties, body):
         message_rec = body.decode("utf-8").split('_')
-        self.filename = message_rec[0]
-        self.num_parts = message_rec[1]
+        self.filename = str(message_rec[0])
+        self.num_parts = int(message_rec[1])
         self.response = True
 
     def callback_actions_backend(self, ch, method, properties, body):
