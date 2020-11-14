@@ -7,6 +7,8 @@ class BackendCoord:
         self.hor_parts = None
         self.vert_parts = None
         self.num_parts = None
+        self.hor_chunk = 60
+        self.vert_chunk = 30
         self.num_workers = num_workers
 
         self.connection_frontend = pika.BlockingConnection(pika.ConnectionParameters(host='localhost'))
@@ -19,9 +21,6 @@ class BackendCoord:
         self.response = None
 
         self.borders = [-125, -65, 21, 51]
-        self.cents = [36, -95]
-        self.ths = [31, 41, -105, -85]
-        self.frs = [28.5, 36, 43.5, -110, -95, -80]
 
         result = self.channel_frontend.queue_declare(queue='backend_coord_queue', exclusive=False)  # Queue for queries to frontend
         self.query_queue = result.method.queue
@@ -44,55 +43,16 @@ class BackendCoord:
             self.response = None
             bord = self.borders
             message = []
-            if self.num_parts == 1:
-                message.append('{}_{}_{}_{}_{}_{}_{}_{}_{}'.format(self.filename, bord[0], bord[2], bord[0], bord[3], bord[1], bord[3], bord[1], bord[2]))
-
-            if self.num_parts == 2:
-                message.append('{}_{}_{}_{}_{}_{}_{}_{}_{}'.format(self.filename, self.cents[1], bord[2], self.cents[1], bord[3], bord[1], bord[3], bord[1], bord[2]))
-
-                message.append('{}_{}_{}_{}_{}_{}_{}_{}_{}'.format(self.filename, bord[0], bord[2], bord[0], bord[3], self.cents[1], bord[3], self.cents[1], bord[2]))
-
-            if self.num_parts == 4:
-                message.append('{}_{}_{}_{}_{}_{}_{}_{}_{}'.format(self.filename, bord[0], bord[2], bord[0], self.cents[0], self.cents[1], self.cents[0], self.cents[1], bord[2]))
-                message.append('{}_{}_{}_{}_{}_{}_{}_{}_{}'.format(self.filename, bord[0], self.cents[0], bord[0], bord[3], self.cents[1], bord[3], self.cents[1], self.cents[0]))
-
-                message.append('{}_{}_{}_{}_{}_{}_{}_{}_{}'.format(self.filename, self.cents[1], bord[2], self.cents[1], self.cents[0], bord[1], self.cents[0], bord[1], bord[2]))
-                message.append('{}_{}_{}_{}_{}_{}_{}_{}_{}'.format(self.filename, self.cents[1], self.cents[0], self.cents[1], bord[3], bord[1], bord[3], bord[1], self.cents[0]))
-
-            if self.num_parts == 9:
-                message.append('{}_{}_{}_{}_{}_{}_{}_{}_{}'.format(self.filename, bord[0], bord[2],     bord[0], self.ths[0], self.ths[2], self.ths[0], self.ths[2], bord[2]))
-                message.append('{}_{}_{}_{}_{}_{}_{}_{}_{}'.format(self.filename, bord[0], self.ths[0], bord[0], self.ths[1], self.ths[2], self.ths[1], self.ths[2], self.ths[0]))
-                message.append('{}_{}_{}_{}_{}_{}_{}_{}_{}'.format(self.filename, bord[0], self.ths[1], bord[0], bord[3],     self.ths[2], bord[3],     self.ths[2], self.ths[1]))
-
-                message.append('{}_{}_{}_{}_{}_{}_{}_{}_{}'.format(self.filename, self.ths[2], bord[2],     self.ths[2], self.ths[0], self.ths[3], self.ths[0], self.ths[3], bord[2]))
-                message.append('{}_{}_{}_{}_{}_{}_{}_{}_{}'.format(self.filename, self.ths[2], self.ths[0], self.ths[2], self.ths[1], self.ths[3], self.ths[1], self.ths[3], self.ths[0]))
-                message.append('{}_{}_{}_{}_{}_{}_{}_{}_{}'.format(self.filename, self.ths[2], self.ths[1], self.ths[2], bord[3],     self.ths[3], bord[3],     self.ths[3], self.ths[1]))
-
-                message.append('{}_{}_{}_{}_{}_{}_{}_{}_{}'.format(self.filename, self.ths[3], bord[2],     self.ths[3], self.ths[0], bord[1], self.ths[0], bord[1], bord[2]))
-                message.append('{}_{}_{}_{}_{}_{}_{}_{}_{}'.format(self.filename, self.ths[3], self.ths[0], self.ths[3], self.ths[1], bord[1], self.ths[1], bord[1], self.ths[0]))
-                message.append('{}_{}_{}_{}_{}_{}_{}_{}_{}'.format(self.filename, self.ths[3], self.ths[1], self.ths[3], bord[3],     bord[1], bord[3],     bord[1], self.ths[1]))
-
-            if self.num_parts == 16:
-                message.append('{}_{}_{}_{}_{}_{}_{}_{}_{}'.format(self.filename, bord[0], bord[2],     bord[0], self.frs[0], self.frs[3], self.frs[0], self.frs[3], bord[2]))
-                message.append('{}_{}_{}_{}_{}_{}_{}_{}_{}'.format(self.filename, bord[0], self.frs[0], bord[0], self.frs[1], self.frs[3], self.frs[1], self.frs[3], self.frs[0]))
-                message.append('{}_{}_{}_{}_{}_{}_{}_{}_{}'.format(self.filename, bord[0], self.frs[1], bord[0], self.frs[2], self.frs[3], self.frs[2], self.frs[3], self.frs[1]))
-                message.append('{}_{}_{}_{}_{}_{}_{}_{}_{}'.format(self.filename, bord[0], self.frs[2], bord[0], bord[3],     self.frs[3], bord[3],     self.frs[3], self.frs[2]))
-
-                message.append('{}_{}_{}_{}_{}_{}_{}_{}_{}'.format(self.filename, self.frs[3], bord[2],     self.frs[3], self.frs[0], self.frs[4], self.frs[0], self.frs[4], bord[2]))
-                message.append('{}_{}_{}_{}_{}_{}_{}_{}_{}'.format(self.filename, self.frs[3], self.frs[0], self.frs[3], self.frs[1], self.frs[4], self.frs[1], self.frs[4], self.frs[0]))
-                message.append('{}_{}_{}_{}_{}_{}_{}_{}_{}'.format(self.filename, self.frs[3], self.frs[1], self.frs[3], self.frs[2], self.frs[4], self.frs[2], self.frs[4], self.frs[1]))
-                message.append('{}_{}_{}_{}_{}_{}_{}_{}_{}'.format(self.filename, self.frs[3], self.frs[2], self.frs[3], bord[3],     self.frs[4], bord[3],     self.frs[4], self.frs[2]))
-
-                message.append('{}_{}_{}_{}_{}_{}_{}_{}_{}'.format(self.filename, self.frs[4], bord[2],     self.frs[4], self.frs[0], self.frs[5], self.frs[0], self.frs[5], bord[2]))
-                message.append('{}_{}_{}_{}_{}_{}_{}_{}_{}'.format(self.filename, self.frs[4], self.frs[0], self.frs[4], self.frs[1], self.frs[5], self.frs[1], self.frs[5], self.frs[0]))
-                message.append('{}_{}_{}_{}_{}_{}_{}_{}_{}'.format(self.filename, self.frs[4], self.frs[1], self.frs[4], self.frs[2], self.frs[5], self.frs[2], self.frs[5], self.frs[1]))
-                message.append('{}_{}_{}_{}_{}_{}_{}_{}_{}'.format(self.filename, self.frs[4], self.frs[2], self.frs[4], bord[3],     self.frs[5], bord[3],     self.frs[5], self.frs[2]))
-
-                message.append('{}_{}_{}_{}_{}_{}_{}_{}_{}'.format(self.filename, self.frs[5], bord[2],     self.frs[5], self.frs[0], bord[1], self.frs[0], bord[1], bord[2]))
-                message.append('{}_{}_{}_{}_{}_{}_{}_{}_{}'.format(self.filename, self.frs[5], self.frs[0], self.frs[5], self.frs[1], bord[1], self.frs[1], bord[1], self.frs[0]))
-                message.append('{}_{}_{}_{}_{}_{}_{}_{}_{}'.format(self.filename, self.frs[5], self.frs[1], self.frs[5], self.frs[2], bord[1], self.frs[2], bord[1], self.frs[1]))
-                message.append('{}_{}_{}_{}_{}_{}_{}_{}_{}'.format(self.filename, self.frs[5], self.frs[2], self.frs[5], bord[3],     bord[1], bord[3],     bord[1], self.frs[2]))
-
+            for i in range(self.num_parts):
+                coord1 = bord[0] + self.hor_chunk * (i % self.hor_parts)
+                coord2 = bord[2] + self.vert_chunk * (i / self.vert_parts)
+                coord3 = coord1
+                coord4 = bord[2] + self.vert_chunk * ((i / self.vert_parts) + 1)
+                coord5 = bord[0] + self.hor_chunk * ((i % self.hor_parts) + 1)
+                coord6 = coord4
+                coord7 = coord5
+                coord8 = coord2
+                message.append('{}_{}_{}_{}_{}_{}_{}_{}_{}'.format(self.filename, coord1, coord2, coord3, coord4, coord5, coord6, coord7, coord8))
             for i in range(self.num_parts):
                 self.channel_backend.basic_publish(exchange='', routing_key='worker_{}'.format(i % self.num_workers), body=message[i])
 
@@ -106,6 +66,8 @@ class BackendCoord:
         self.filename = str(message_rec[0])
         self.hor_parts = int(message_rec[1])
         self.vert_parts = int(message_rec[2])
+        self.hor_chunk /= self.hor_parts
+        self.vert_chunk /= self.vert_parts
         self.num_parts = self.hor_parts * self.vert_parts
         self.response = True
 
