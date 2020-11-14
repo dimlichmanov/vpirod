@@ -20,7 +20,7 @@ class BackendCoord:
         self.properties = None
         self.response = None
 
-        self.borders = [-125, -65, 21, 51]
+        self.borders = [-125, 21]
 
         result = self.channel_frontend.queue_declare(queue='backend_coord_queue', exclusive=False)  # Queue for queries to frontend
         self.query_queue = result.method.queue
@@ -41,14 +41,13 @@ class BackendCoord:
         self.start_consumer_frontend()
         if self.response:
             self.response = None
-            bord = self.borders
             message = []
             for i in range(self.num_parts):
-                coord1 = bord[0] + self.hor_chunk * (i % self.hor_parts)
-                coord2 = bord[2] + self.vert_chunk * (i / self.vert_parts)
+                coord1 = self.borders[0] + self.hor_chunk * (i % self.hor_parts)
+                coord2 = self.borders[1] + self.vert_chunk * (i // self.hor_parts)
                 coord3 = coord1
-                coord4 = bord[2] + self.vert_chunk * ((i / self.vert_parts) + 1)
-                coord5 = bord[0] + self.hor_chunk * ((i % self.hor_parts) + 1)
+                coord4 = self.borders[1] + self.vert_chunk * ((i // self.hor_parts) + 1)
+                coord5 = self.borders[0] + self.hor_chunk * ((i % self.hor_parts) + 1)
                 coord6 = coord4
                 coord7 = coord5
                 coord8 = coord2

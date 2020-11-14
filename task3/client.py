@@ -45,8 +45,8 @@ class Client:
 
 
 if __name__ == '__main__':
-    horizontal_nums = int(input('Enter nums of horizontal blocks'))
-    vertical_nums = int(input('Enter nums of vertical blocks'))
+    horizontal_nums = int(input('Enter nums of horizontal blocks: '))
+    vertical_nums = int(input('Enter nums of vertical blocks: '))
 
     geojson_full = './admin1-us.geojson'
 
