@@ -28,7 +28,7 @@ class Backend:
             self.filename = str(els[0])
             file = geopandas.read_file(self.filename)
             file.drop(index=[3, 50], inplace=True)
-            quadrant = geopandas.GeoSeries([Polygon([(int(els[1]), int(els[2])), (int(els[3]), int(els[4])), (int(els[5]), int(els[6])), (int(els[7]), int(els[8]))])])
+            quadrant = geopandas.GeoSeries([Polygon([(float(els[1]), float(els[2])), (float(els[3]), float(els[4])), (float(els[5]), float(els[6])), (float(els[7]), float(els[8]))])])
             df1 = geopandas.GeoDataFrame({'geometry': quadrant, 'df1': [1]})
             res_intersect = geopandas.overlay(df1, file, how='intersection')
             res_intersect = res_intersect.to_json()
