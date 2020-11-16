@@ -34,7 +34,6 @@ class Backend:
             res_intersect = res_intersect.to_json()
             self.channel.basic_publish(exchange='', routing_key='workers_to_coord_queue', body=res_intersect)
 
-
     def start_consumer(self):
         self.channel.basic_consume(
             queue=self.queue_name, on_message_callback=self.callback_actions, auto_ack=True)
