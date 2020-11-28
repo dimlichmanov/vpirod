@@ -5,6 +5,7 @@ import pygeos
 import json
 from shapely.geometry import Polygon
 import pika
+import random
 
 
 class Backend:
@@ -13,6 +14,7 @@ class Backend:
         self.connection = pika.BlockingConnection(pika.ConnectionParameters(host='localhost'))
         self.channel = self.connection.channel()
         self.filename = None
+        self.PID = random.randint(0, 100)
 
         result = self.channel.queue_declare(queue='worker_{}'.format(num), exclusive=True)
         self.queue_name = result.method.queue
@@ -38,6 +40,10 @@ class Backend:
         self.channel.basic_consume(
             queue=self.queue_name, on_message_callback=self.callback_actions, auto_ack=True)
         self.channel.start_consuming()
+
+    def acquire_queue(self):
+        # If current process is elected
+
 
 
 if __name__ == '__main__':
