@@ -42,17 +42,26 @@ class Backend:
         self.channel = self.connection.channel()
         self.filename = None
         self.num = num
+        self.total_num = total_num
         self.UID = random.randint(0, 100)
         self.CR_queue = 'queue_{}'.format((num+1) % total_num)  # queue for Chang_roberts algorithm
         self.participate = Participate()
         self.round_robin = 0
+        self.connection_frontend = None
+        self.connection_backend = None
+        self.properties = None
+        self.response = None
+        self.channel_frontend = None
+        self.channel_backend = None
+        self.query_queue = None
+        self.callback_queue = None
 
         result = self.channel.queue_declare(queue='worker_{}'.format(num), exclusive=True)
         self.queue_name = result.method.queue
 
         self.channel.confirm_delivery()
 
-        self.CR_thread = threading.Thread()  # Thread is listening to election messages # TODO init connection
+        self.CR_thread = threading.Thread(target=self.CR_function)
         self.CR_thread.start()
 
         # Sleeping on receive channel
@@ -82,29 +91,110 @@ class Backend:
                 if self.participate.check_value() == 0:  # Если мы первые кто обнаружил проблему
                     self.run_election()
                 self.CR_thread.join()
-                if self.participate.check_leader() :
-                    pass
-                    # TODO раскидать сообщения и захватить очереди
+                if self.participate.check_leader():
+                    self.start_consumer_leader()  # Раскидали сообщения
+                    self.connection_frontend = pika.BlockingConnection(pika.ConnectionParameters(host='localhost'))
+                    self.channel_frontend = self.connection_frontend.channel()
 
+                    self.connection_backend = pika.BlockingConnection(pika.ConnectionParameters(host='localhost'))
+                    self.channel_backend = self.connection_backend.channel()
 
-    def run_election(self):
-        election_message = 'ELECTION_{}_{}'.format(self.num, self.UID)
-        self.channel.basic_publish(exchange='', routing_key='workers_to_coord_queue', body=election_message)
+                    self.properties = None
+                    self.response = None
 
+                    result = self.channel_frontend.queue_declare(queue='backend_coord_queue', exclusive=False)  # Queue for queries to frontend
+                    self.query_queue = result.method.queue
+                    result = self.channel_backend.queue_declare(queue='workers_to_coord_queue', exclusive=True)  # Queue for backend-frontend communication
+                    self.callback_queue = result.method.queue
+
+                    self.channel_backend.basic_consume(
+                        queue=self.callback_queue,
+                        on_message_callback=self.callback_actions_backend,
+                        auto_ack=True)
+
+                    self.channel.basic_publish(exchange='',
+                                               routing_key='back_to_front_queue',
+                                               body=res_intersect)
+
+                    while True:
+                        message_resp = self.start_consumer_backend()
+                        self.channel_backend.basic_publish(exchange='', routing_key='back_to_front_queue', body=message_resp)
+                        self.response = None
+                else:
+
+                    self.channel.basic_publish(exchange='',
+                                               routing_key='workers_to_coord_queue',
+                                               body=res_intersect)
+
+    # Methods for second thread
+
+    def CR_function(self):
+        self.counter = 0
+        self.cr_connection = pika.BlockingConnection(pika.ConnectionParameters(host='localhost'))
+        self.cr_channel = self.connection.channel()
+
+        result = self.cr_channel.queue_declare(queue='cr_{}'.format(self.num))
+        self.cr_queue_name = result.method.queue
+
+        while self.counter != 2:
+            self.cr_channel.process_data_events()
+        return
 
     def cr_callback(self, ch, method, properties, body):
         parts = body.decode("utf-8").split('_')
         if parts[0] == 'ELECTION' and self.participate.check_value() == 0:
+            self.counter = 1
             self.participate.start_election()
             winner = max(int(parts[2]), self.UID)
+            election_message = 'ELECTION_{}_{}'.format(self.num, winner)
+            right_neighbor = (self.num + 1) % self.total_num
+            self.channel.basic_publish(exchange='', routing_key='cr_{}'.format(right_neighbor), body=election_message)
+
+        if parts[0] == 'ELECTION' and self.participate.check_value() == 1 and int(parts[1]) == self.num:
+            self.counter = 2
+            election_message = 'ELECTED_{}_{}'.format(self.num, int(parts[2]))
+            right_neighbor = (self.num + 1) % self.total_num
+            self.participate.finish_election(int(parts[2]) == self.UID)
+            self.channel.basic_publish(exchange='', routing_key='cr_{}'.format(right_neighbor), body=election_message)
+
+        if parts[0] == 'ELECTION' and self.participate.check_value() == 1 and int(parts[1]) != self.num:
+            pass
+
+        if parts[0] == 'ELECTED' and self.participate.check_value() == 1:
+            self.counter = 2
+            election_message = 'ELECTED_{}_{}'.format(self.num, int(parts[2]))
+            right_neighbor = (self.num + 1) % self.total_num
+            if right_neighbor != 0:
+                self.participate.finish_election(int(parts[2]) == self.UID)
+                self.channel.basic_publish(exchange='', routing_key='cr_{}'.format(right_neighbor), body=election_message)
+
+    # Methods for election
+
+    def run_election(self):
+        election_message = 'ELECTION_{}_{}'.format(self.num, self.UID)
+        right_neighbor = (self.num+1) % self.total_num
+        self.channel.basic_publish(exchange='', routing_key='cr_{}'.format(right_neighbor), body=election_message)
+
+    def callback_actions_backend(self, ch, method, properties, body):
+        message_rec = body
+        self.response = message_rec
+
+    def start_consumer_backend(self):
+        while self.response is None:
+            self.connection_backend.process_data_events()
+        return self.response
 
     def callback_actions_leader(self, ch, method, properties, body):
         els = body.decode("utf-8").split('_')
         if els[0] == "ELECTED":
             return
         else:
-
-
+            if self.round_robin != self.num:
+                self.channel.basic_publish(exchange='', routing_key='worker_{}'.format(self.round_robin), body=body)
+                self.round_robin = (self.round_robin+1) % self.total_num
+            else:
+                self.round_robin = (self.round_robin + 1) % self.total_num
+                self.channel.basic_publish(exchange='', routing_key='worker_{}'.format(self.round_robin), body=body)  # TODO case if 1 worker
 
     def start_consumer(self):
         self.channel.basic_consume(
@@ -115,11 +205,6 @@ class Backend:
         self.channel.basic_consume(
             queue=self.queue_name, on_message_callback=self.callback_actions_leader, auto_ack=True)
         self.channel.start_consuming()
-
-    def acquire_queue(self):
-        # If current process is elected
-        pass
-
 
 
 if __name__ == '__main__':
