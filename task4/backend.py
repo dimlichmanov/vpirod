@@ -15,18 +15,24 @@ class Participate(object):
     def __init__(self):
         self.value = 0
         self._lock = threading.Lock()
+        self.leader = 0
 
     def start_election(self):
         with self._lock:
             self.value = 1
 
-    def finish_election(self):
+    def finish_election(self, if_leader):
         with self._lock:
             self.value = 0
+            self.leader = if_leader
 
     def check_value(self):
         with self._lock:
             return self.value
+
+    def check_leader(self):
+        with self._lock:
+            return self.leader
 
 
 class Backend:
@@ -39,13 +45,16 @@ class Backend:
         self.UID = random.randint(0, 100)
         self.CR_queue = 'queue_{}'.format((num+1) % total_num)  # queue for Chang_roberts algorithm
         self.participate = Participate()
+        self.round_robin = 0
 
         result = self.channel.queue_declare(queue='worker_{}'.format(num), exclusive=True)
         self.queue_name = result.method.queue
 
         self.channel.confirm_delivery()
 
-        self.CR_thread = threading.Thread(target=)  # Thread is listening to election messages
+        self.CR_thread = threading.Thread()  # Thread is listening to election messages # TODO init connection
+        self.CR_thread.start()
+
         # Sleeping on receive channel
         self.start_consumer()
 
@@ -68,11 +77,15 @@ class Backend:
                                            properties=pika.BasicProperties(content_type='text/plain',
                                                                            delivery_mode=1),
                                            mandatory=True)
-                print('Message was published')
+                #  print('Message was published')
             except pika.exceptions.UnroutableError:
-                print('Message was returned')
-                # TODO run an election
-            # self.channel.basic_publish(exchange='', routing_key='workers_to_coord_queue', body=res_intersect)
+                if self.participate.check_value() == 0:  # Если мы первые кто обнаружил проблему
+                    self.run_election()
+                self.CR_thread.join()
+                if self.participate.check_leader() :
+                    pass
+                    # TODO раскидать сообщения и захватить очереди
+
 
     def run_election(self):
         election_message = 'ELECTION_{}_{}'.format(self.num, self.UID)
@@ -85,11 +98,22 @@ class Backend:
             self.participate.start_election()
             winner = max(int(parts[2]), self.UID)
 
+    def callback_actions_leader(self, ch, method, properties, body):
+        els = body.decode("utf-8").split('_')
+        if els[0] == "ELECTED":
+            return
+        else:
+
 
 
     def start_consumer(self):
         self.channel.basic_consume(
             queue=self.queue_name, on_message_callback=self.callback_actions, auto_ack=True)
+        self.channel.start_consuming()
+
+    def start_consumer_leader(self):
+        self.channel.basic_consume(
+            queue=self.queue_name, on_message_callback=self.callback_actions_leader, auto_ack=True)
         self.channel.start_consuming()
 
     def acquire_queue(self):
