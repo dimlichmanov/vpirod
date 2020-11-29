@@ -73,6 +73,7 @@ class BackendCoord:
     def callback_actions_backend(self, ch, method, properties, body):
         message_rec = body
         self.response = message_rec
+        ch.basic_ack(delivery_tag=method.delivery_tag)
 
     def start_consumer_frontend(self):
         while self.response is None:
