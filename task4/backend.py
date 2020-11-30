@@ -56,6 +56,7 @@ class Backend:
         self.query_queue = None
         self.callback_queue = None
         self.transfer = False
+        self.new_leader = False
 
         result = self.channel.queue_declare(queue='worker_{}'.format(num), exclusive=True)
         self.queue_name = result.method.queue
@@ -96,39 +97,15 @@ class Backend:
                 if self.participate.check_value() == 0:  # Если мы первые кто обнаружил проблему
                     self.run_election()
                 self.CR_thread.join()
+                print('Joined thread')
                 if self.participate.check_leader():
-                    self.start_consumer_leader()  # Раскидали сообщения
-                    self.connection_frontend = pika.BlockingConnection(pika.ConnectionParameters(host='localhost'))
-                    self.channel_frontend = self.connection_frontend.channel()
-
-                    self.connection_backend = pika.BlockingConnection(pika.ConnectionParameters(host='localhost'))
-                    self.channel_backend = self.connection_backend.channel()
-
-                    self.properties = None
-                    self.response = None
-
-                    result = self.channel_frontend.queue_declare(queue='backend_coord_queue', exclusive=False)  # Queue for queries from frontend
-                    self.query_queue = result.method.queue
-                    result = self.channel_backend.queue_declare(queue='workers_to_coord_queue', exclusive=False)  # Queue for backend-frontend communication
-                    self.callback_queue = result.method.queue
-
-                    self.channel_backend.basic_consume(
-                        queue=self.callback_queue,
-                        on_message_callback=self.callback_actions_backend,
-                        auto_ack=True)
-
-                    self.channel.basic_publish(exchange='',
-                                               routing_key='back_to_front_queue',
-                                               body=res_intersect)
-
-                    while True:
-                        message_resp = self.start_consumer_backend()
-                        self.channel_backend.basic_publish(exchange='', routing_key='back_to_front_queue', body=message_resp)
-                        self.response = None
+                    print('Joined thread LEADER')
+                    self.new_leader = True
                 else:
-                    self.channel.basic_publish(exchange='',
-                                               routing_key='workers_to_coord_queue',
-                                               body=res_intersect)
+                    print('not leader')
+                self.channel.basic_publish(exchange='',
+                                           routing_key='back_to_front_queue',
+                                           body=res_intersect)
 
     # Methods for second thread
 
@@ -140,39 +117,48 @@ class Backend:
         result = self.cr_channel.queue_declare(queue='cr_{}'.format(self.num))
         self.cr_queue_name = result.method.queue
 
+        self.cr_channel.basic_consume(
+            queue=self.cr_queue_name,
+            on_message_callback=self.cr_callback,
+            auto_ack=True)
+
         while self.counter != 2:
             time.sleep(1)
-            print('THERE')
             self.cr_connection.process_data_events()
         return
 
     def cr_callback(self, ch, method, properties, body):
         print('RECEIVED')
         parts = body.decode("utf-8").split('_')
-        if parts[0] == 'ELECTION' and self.participate.check_value() == 0:
+        if parts[0] == 'ELECTION' and self.participate.check_value() == 0: # где то приняли сообщение, мы не инициаторы
             self.counter = 1
             self.participate.start_election()
             winner = max(int(parts[2]), self.UID)
-            election_message = 'ELECTION_{}_{}'.format(self.num, winner)
+            election_message = 'ELECTION_{}_{}'.format(int(parts[1]), winner)
+            print('tut1', election_message)
             right_neighbor = (self.num + 1) % self.total_num
             self.cr_channel.basic_publish(exchange='', routing_key='cr_{}'.format(right_neighbor), body=election_message)
 
-        if parts[0] == 'ELECTION' and self.participate.check_value() == 1 and int(parts[1]) == self.num:
+        elif parts[0] == 'ELECTION' and self.participate.check_value() == 1 and int(parts[1]) == self.num:  # к инициатору вернулось сообщение
             self.counter = 2
-            election_message = 'ELECTED_{}_{}'.format(self.num, int(parts[2]))
+            print('SEND VOTAGE MESSAGE')
+            election_message = 'ELECTED_{}_{}'.format(int(parts[1]), int(parts[2]))
             right_neighbor = (self.num + 1) % self.total_num
+            print('tut2', election_message)
             self.participate.finish_election(int(parts[2]) == self.UID)
             self.channel.basic_publish(exchange='', routing_key='cr_{}'.format(right_neighbor), body=election_message)
 
-        if parts[0] == 'ELECTION' and self.participate.check_value() == 1 and int(parts[1]) != self.num:
+        elif parts[0] == 'ELECTION' and self.participate.check_value() == 1 and int(parts[1]) != self.num:
+            print('tut3')
             pass
 
-        if parts[0] == 'ELECTED' and self.participate.check_value() == 1:
+        elif parts[0] == 'ELECTED' and self.participate.check_value() == 1: # выходим из голосования
             self.counter = 2
-            election_message = 'ELECTED_{}_{}'.format(self.num, int(parts[2]))
+            election_message = 'ELECTED_{}_{}'.format(int(parts[1]), int(parts[2]))
             right_neighbor = (self.num + 1) % self.total_num
+            print('tut4', election_message)
+            self.participate.finish_election(int(parts[2]) == self.UID)
             if right_neighbor != 0:
-                self.participate.finish_election(int(parts[2]) == self.UID)
                 self.channel.basic_publish(exchange='', routing_key='cr_{}'.format(right_neighbor), body=election_message)
 
     # Methods for election
@@ -180,12 +166,9 @@ class Backend:
     def run_election(self):
         election_message = 'ELECTION_{}_{}'.format(self.num, self.UID)
         right_neighbor = (self.num+1) % self.total_num
-        print(right_neighbor)
+        self.participate.start_election()
+        print(election_message)
         self.channel.basic_publish(exchange='', routing_key='cr_{}'.format(right_neighbor), body=election_message)
-
-    def callback_actions_backend(self, ch, method, properties, body):
-        message_rec = body
-        self.response = message_rec
 
     # Methods for consumer leader
 
@@ -208,6 +191,12 @@ class Backend:
                 self.channel.basic_publish(exchange='', routing_key='worker_{}'.format(self.round_robin), body=body)
                 print(self.round_robin)
 
+    # Consumer leader
+
+    def callback_actions_backend(self, ch, method, properties, body):
+        message_rec = body
+        self.response = message_rec
+
     def start_consumer_backend(self):
         while self.response is None:
             self.connection_backend.process_data_events()
@@ -216,7 +205,33 @@ class Backend:
     def start_consumer(self):
         self.channel.basic_consume(
             queue=self.queue_name, on_message_callback=self.callback_actions, auto_ack=True)
-        self.channel.start_consuming()
+        while self.new_leader is False:
+            self.connection.process_data_events()
+        if self.new_leader:
+            self.start_consumer_leader()  # Раскидали сообщения
+            self.connection_frontend = pika.BlockingConnection(pika.ConnectionParameters(host='localhost'))
+            self.channel_frontend = self.connection_frontend.channel()
+
+            self.connection_backend = pika.BlockingConnection(pika.ConnectionParameters(host='localhost'))
+            self.channel_backend = self.connection_backend.channel()
+
+            self.properties = None
+            self.response = None
+
+            result = self.channel_frontend.queue_declare(queue='backend_coord_queue', exclusive=False)  # Queue for queries from frontend
+            self.query_queue = result.method.queue
+            result = self.channel_backend.queue_declare(queue='workers_to_coord_queue', exclusive=False)  # Queue for backend-frontend communication
+            self.callback_queue = result.method.queue
+
+            self.channel_backend.basic_consume(
+                queue=self.callback_queue,
+                on_message_callback=self.callback_actions_backend,
+                auto_ack=True)
+
+            while True:
+                message_resp = self.start_consumer_backend()
+                self.channel_backend.basic_publish(exchange='', routing_key='back_to_front_queue', body=message_resp)
+                self.response = None
 
 
 if __name__ == '__main__':
