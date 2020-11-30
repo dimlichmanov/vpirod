@@ -43,8 +43,8 @@ class Backend:
         self.filename = None
         self.num = num
         self.total_num = total_num
-        self.UID = random.randint(0, 100)
-        self.CR_queue = 'queue_{}'.format((num+1) % total_num)  # queue for Chang_roberts algorithm
+        # self.UID = random.randint(0, 100)
+        self.UID = 100 - num
         self.participate = Participate()
         self.round_robin = 0
         self.connection_frontend = None
@@ -55,6 +55,7 @@ class Backend:
         self.channel_backend = None
         self.query_queue = None
         self.callback_queue = None
+        self.transfer = False
 
         result = self.channel.queue_declare(queue='worker_{}'.format(num), exclusive=True)
         self.queue_name = result.method.queue
@@ -69,7 +70,10 @@ class Backend:
 
     def callback_actions(self, ch, method, properties, body):
         # Split a message, retrieve coordinates and send a json file
-        time.sleep(15)  # Accept that coordinator send all parts before workers started their run
+        if self.num == 0:
+            time.sleep(15)  # Accept that coordinator send all parts before workers started their run
+        else:
+            time.sleep(25)
         els = body.decode("utf-8").split('_')
         if len(els) > 1:  # Working with coordinates
             self.filename = str(els[0])
@@ -86,8 +90,9 @@ class Backend:
                                            properties=pika.BasicProperties(content_type='text/plain',
                                                                            delivery_mode=1),
                                            mandatory=True)
-                #  print('Message was published')
+                print('Sent')
             except pika.exceptions.UnroutableError:
+                print('Error')
                 if self.participate.check_value() == 0:  # Если мы первые кто обнаружил проблему
                     self.run_election()
                 self.CR_thread.join()
@@ -102,9 +107,9 @@ class Backend:
                     self.properties = None
                     self.response = None
 
-                    result = self.channel_frontend.queue_declare(queue='backend_coord_queue', exclusive=False)  # Queue for queries to frontend
+                    result = self.channel_frontend.queue_declare(queue='backend_coord_queue', exclusive=False)  # Queue for queries from frontend
                     self.query_queue = result.method.queue
-                    result = self.channel_backend.queue_declare(queue='workers_to_coord_queue', exclusive=True)  # Queue for backend-frontend communication
+                    result = self.channel_backend.queue_declare(queue='workers_to_coord_queue', exclusive=False)  # Queue for backend-frontend communication
                     self.callback_queue = result.method.queue
 
                     self.channel_backend.basic_consume(
@@ -121,7 +126,6 @@ class Backend:
                         self.channel_backend.basic_publish(exchange='', routing_key='back_to_front_queue', body=message_resp)
                         self.response = None
                 else:
-
                     self.channel.basic_publish(exchange='',
                                                routing_key='workers_to_coord_queue',
                                                body=res_intersect)
@@ -131,16 +135,19 @@ class Backend:
     def CR_function(self):
         self.counter = 0
         self.cr_connection = pika.BlockingConnection(pika.ConnectionParameters(host='localhost'))
-        self.cr_channel = self.connection.channel()
+        self.cr_channel = self.cr_connection.channel()
 
         result = self.cr_channel.queue_declare(queue='cr_{}'.format(self.num))
         self.cr_queue_name = result.method.queue
 
         while self.counter != 2:
-            self.cr_channel.process_data_events()
+            time.sleep(1)
+            print('THERE')
+            self.cr_connection.process_data_events()
         return
 
     def cr_callback(self, ch, method, properties, body):
+        print('RECEIVED')
         parts = body.decode("utf-8").split('_')
         if parts[0] == 'ELECTION' and self.participate.check_value() == 0:
             self.counter = 1
@@ -148,7 +155,7 @@ class Backend:
             winner = max(int(parts[2]), self.UID)
             election_message = 'ELECTION_{}_{}'.format(self.num, winner)
             right_neighbor = (self.num + 1) % self.total_num
-            self.channel.basic_publish(exchange='', routing_key='cr_{}'.format(right_neighbor), body=election_message)
+            self.cr_channel.basic_publish(exchange='', routing_key='cr_{}'.format(right_neighbor), body=election_message)
 
         if parts[0] == 'ELECTION' and self.participate.check_value() == 1 and int(parts[1]) == self.num:
             self.counter = 2
@@ -173,42 +180,47 @@ class Backend:
     def run_election(self):
         election_message = 'ELECTION_{}_{}'.format(self.num, self.UID)
         right_neighbor = (self.num+1) % self.total_num
+        print(right_neighbor)
         self.channel.basic_publish(exchange='', routing_key='cr_{}'.format(right_neighbor), body=election_message)
 
     def callback_actions_backend(self, ch, method, properties, body):
         message_rec = body
         self.response = message_rec
 
-    def start_consumer_backend(self):
-        while self.response is None:
-            self.connection_backend.process_data_events()
-        return self.response
+    # Methods for consumer leader
+
+    def start_consumer_leader(self):
+        self.channel.basic_publish(exchange='', routing_key='worker_{}'.format(self.num), body='ELECTED_0')
+        while self.transfer is False:
+            self.connection.process_data_events()
 
     def callback_actions_leader(self, ch, method, properties, body):
         els = body.decode("utf-8").split('_')
         if els[0] == "ELECTED":
-            return
+            self.transfer = True
         else:
             if self.round_robin != self.num:
                 self.channel.basic_publish(exchange='', routing_key='worker_{}'.format(self.round_robin), body=body)
-                self.round_robin = (self.round_robin+1) % self.total_num
+                self.round_robin = (self.round_robin + 1) % self.total_num
+                print(self.round_robin)
             else:
                 self.round_robin = (self.round_robin + 1) % self.total_num
-                self.channel.basic_publish(exchange='', routing_key='worker_{}'.format(self.round_robin), body=body)  # TODO case if 1 worker
+                self.channel.basic_publish(exchange='', routing_key='worker_{}'.format(self.round_robin), body=body)
+                print(self.round_robin)
+
+    def start_consumer_backend(self):
+        while self.response is None:
+            self.connection_backend.process_data_events()
+        return self.response
 
     def start_consumer(self):
         self.channel.basic_consume(
             queue=self.queue_name, on_message_callback=self.callback_actions, auto_ack=True)
         self.channel.start_consuming()
 
-    def start_consumer_leader(self):
-        self.channel.basic_consume(
-            queue=self.queue_name, on_message_callback=self.callback_actions_leader, auto_ack=True)
-        self.channel.start_consuming()
-
 
 if __name__ == '__main__':
     worker_num = int(input('Enter a number of a worker: '))
     number_of_workers = int(input('Enter number of workers: '))
-    server = Backend(num=worker_num, total=number_of_workers)
+    server = Backend(num=worker_num, total_num=number_of_workers)
 
