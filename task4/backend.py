@@ -135,28 +135,23 @@ class Backend:
             self.participate.start_election()
             winner = max(int(parts[2]), self.UID)
             election_message = 'ELECTION_{}_{}'.format(int(parts[1]), winner)
-            print('tut1', election_message)
             right_neighbor = (self.num + 1) % self.total_num
             self.cr_channel.basic_publish(exchange='', routing_key='cr_{}'.format(right_neighbor), body=election_message)
 
         elif parts[0] == 'ELECTION' and self.participate.check_value() == 1 and int(parts[1]) == self.num:  # к инициатору вернулось сообщение
             self.counter = 2
-            print('SEND VOTAGE MESSAGE')
             election_message = 'ELECTED_{}_{}'.format(int(parts[1]), int(parts[2]))
             right_neighbor = (self.num + 1) % self.total_num
-            print('tut2', election_message)
             self.participate.finish_election(int(parts[2]) == self.UID)
             self.channel.basic_publish(exchange='', routing_key='cr_{}'.format(right_neighbor), body=election_message)
 
         elif parts[0] == 'ELECTION' and self.participate.check_value() == 1 and int(parts[1]) != self.num:
-            print('tut3')
             pass
 
         elif parts[0] == 'ELECTED' and self.participate.check_value() == 1: # выходим из голосования
             self.counter = 2
             election_message = 'ELECTED_{}_{}'.format(int(parts[1]), int(parts[2]))
             right_neighbor = (self.num + 1) % self.total_num
-            print('tut4', election_message)
             self.participate.finish_election(int(parts[2]) == self.UID)
             if right_neighbor != 0:
                 self.channel.basic_publish(exchange='', routing_key='cr_{}'.format(right_neighbor), body=election_message)
